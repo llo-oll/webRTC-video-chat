@@ -1,13 +1,17 @@
 
 window.onload = async () => {
-    const video1Elem = document.getElementById("video1");
-    const video2Elem = document.getElementById("video2");
+
+    const videoSelfElem = document.getElementById("video1");
+    const videoOtherElem = document.getElementById("video2");
 
     //Get webcam and mic stream
     const stream = await navigator.mediaDevices.getUserMedia({audio: true, video: true});
 
+    console.log(stream);
     //Connect to html video element
-    video1Elem.srcObject = stream;
+    videoSelfElem.srcObject = stream;
+
+
 
     const peerCon1 = new RTCPeerConnection(null);
     const peerCon2 = new RTCPeerConnection(null);
@@ -27,7 +31,7 @@ window.onload = async () => {
     //This gets called when peerCon2.setRemoteDescription is called.
     peerCon2.ontrack = track_event =>  {
         console.log("peerCon2 ontrack");
-        video2Elem.srcObject = track_event.streams[0];
+        videoOtherElem.srcObject = track_event.streams[0];
     };
 
 
@@ -38,19 +42,13 @@ window.onload = async () => {
         }
     );
 
-    peerCon1.createOffer().then(
-        description => {
-            peerCon1.setLocalDescription(description);
-            peerCon2.setRemoteDescription(description);
+    const description1 = await peerCon1.createOffer();
+    peerCon1.setLocalDescription(description1);
+    peerCon2.setRemoteDescription(description1);
 
-            peerCon2.createAnswer().then(
-                   description => {
-                       peerCon2.setLocalDescription(description);
-                       peerCon1.setRemoteDescription(description);
-                   }
-            );
-        }
-    );
+    const description2 = await peerCon2.createAnswer();
+    peerCon2.setLocalDescription(description2);
+    peerCon1.setRemoteDescription(description2);
 
 
 };
