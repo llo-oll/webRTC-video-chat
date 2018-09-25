@@ -1,7 +1,6 @@
 package main
 
 import (
-	"html/template"
 	"net/http"
 )
 
@@ -29,8 +28,7 @@ func serveScript(writer http.ResponseWriter, request *http.Request) {
 
 //servePage is an http request handler which serves the webchat web page to a client.
 func servePage(writer http.ResponseWriter, request *http.Request) {
-	pageTemplate, _ := template.ParseFiles("page.html")
-	//TODO identifying clients by an id in this way will likely allow spoofing by an attacker.
-	pageTemplate.Execute(writer, map[string]int{"clientId": <-idChan})
-	//http.ServeFile(writer, request, "page.html")
+	//pageTemplate, _ := template.ParseFiles("page.html")
+	//pageTemplate.Execute(writer, map[string]int{"clientId": <-idChan})
+	http.ServeFile(writer, request, "page.html")
 }
