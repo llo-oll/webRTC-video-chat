@@ -32,6 +32,7 @@ func (thisHub *hub) addConnection(conn *websocket.Conn) {
 		}
 		thisHub.log("Closing channel to client")
 		close(chanToClient)
+		delete(thisHub.clientChanMap, clientId)
 	}()
 }
 
