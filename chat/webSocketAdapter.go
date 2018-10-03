@@ -19,8 +19,8 @@ import (
 type webSocketAdapter struct {
 	id          int
 	conn        *websocket.Conn
-	chanFromHub <-chan map[string]string
-	chanToHub   chan<- map[string]string
+	chanFromHub <-chan interface{}
+	chanToHub   chan<- interface{}
 }
 
 //This channel provides unique ids for clients (0,1,...)
@@ -41,9 +41,9 @@ var idChan = func() <-chan int {
 //conn should be a WebSocket connection to the html webSocketAdapter.
 //
 //Returns the id of the new webSocketAdapter and channels for sending and receiving messages.
-func newWebSocketAdapter(conn *websocket.Conn) (clientId int, toClient chan<- map[string]string, fromClient <-chan map[string]string) {
-	chanFromHub := make(chan map[string]string)
-	chanToHub := make(chan map[string]string)
+func newWebSocketAdapter(conn *websocket.Conn) (clientId int, toClient chan<- interface{}, fromClient <-chan interface{}) {
+	chanFromHub := make(chan interface{})
+	chanToHub := make(chan interface{})
 	id := <-idChan
 	newClient := webSocketAdapter{id, conn, chanFromHub, chanToHub}
 	newClient.run()
@@ -74,15 +74,15 @@ func (thisClient *webSocketAdapter) listenToHub() {
 //listenToSocket waits for messages coming over the WebSocket and then sends them over the send channel,
 // to be picked up by the hub.
 func (thisClient *webSocketAdapter) listenToSocket() {
-	thisClient.log("listening to messages from websocket")
+	thisClient.log("Listening to messages from WebSocket")
 	for {
-		var jsonMsg map[string]string
+		var jsonMsg interface{}
 		err := thisClient.conn.ReadJSON(&jsonMsg)
 		if err != nil {
-			thisClient.log(err)
+			thisClient.log("Error in listenToSocket: " + err.Error())
 			break
 		} else {
-			thisClient.log("Sending message")
+			thisClient.log("Sending message to hub")
 			thisClient.chanToHub <- jsonMsg
 		}
 	}
@@ -99,5 +99,5 @@ func (thisClient *webSocketAdapter) Close() {
 }
 
 func (thisClient *webSocketAdapter) log(entry interface{}) {
-	log.Printf("Client %d:\t%s", thisClient.id, entry)
+	log.Printf("sockAdapter %d:\t%s", thisClient.id, entry)
 }

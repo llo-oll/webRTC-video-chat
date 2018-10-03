@@ -1,89 +1,142 @@
-window.onload = () => {
-    openWebsocket();
+window.onload = async () => {
+    {
+        const videoSelfElem = document.getElementById("video1");
+        const videoOtherElem = document.getElementById("video2");
+        const callButton = document.getElementById("callbutton");
 
+        const sock = openWebsocket();
+        const selfStream = await getSelfVideoStream();
+        videoSelfElem.srcObject = selfStream;
+
+        const peerCon = new RTCPeerConnection(null);
+
+        addTracks(peerCon, selfStream);
+
+        setUpIceCallbacks(sock, peerCon);
+
+        callButton.onclick = () => initiateVideoCall(sock, peerCon);
+
+        sock.onmessage = event => receiveMessage(event.data, peerCon, sock);
+
+
+        // //This gets called when peerCon.setRemoteDescription is called.
+        peerCon.ontrack = track_event => {
+            console.log("peerCon ontrack");
+            videoOtherElem.srcObject = track_event.streams[0];
+        };
+    }
+
+    async function receiveVideoCall(offer, peerCon, sock) {
+        console.log("Received offer of video call");
+        const description = await new RTCSessionDescription(offer);
+        await peerCon.setRemoteDescription(description);
+        const answer = await peerCon.createAnswer();
+        await peerCon.setLocalDescription(answer);
+        sendMessage(sock, "answer", answer);
+    }
+
+    function receiveAnswer(answer, peerCon) {
+        const description = new RTCSessionDescription(answer);
+        peerCon.setRemoteDescription(description);
+    }
+
+    function receiveIceCandidate(candidate, peerCon) {
+        console.log("XXXX" + candidate);
+        if (candidate === null) {
+           return;
+        }
+        const rtcIceCandidate =  new RTCIceCandidate(candidate);
+        peerCon.addIceCandidate(rtcIceCandidate);
+    }
+
+
+    function sendMessage(sock, type, msg) {
+       sock.send(JSON.stringify({"type": type, message: msg}));
+    }
+
+    function receiveMessage(msg, peerCon, sock) {
+        msg = JSON.parse(msg);
+        console.log("Received message");
+
+       switch (msg.type) {
+           case "offer":
+               console.log("Received offer");
+               receiveVideoCall(msg.message, peerCon, sock);
+               break;
+           case "answer":
+               receiveAnswer(msg.message, peerCon);
+               break;
+           case "icecandidate":
+               console.log("Received ice candidate");
+               receiveIceCandidate(msg.message, peerCon);
+               break;
+           default:
+               console.log("Received unclassified message");
+               console.log(msg);
+       }
+    }
+
+
+    function setUpIceCallbacks(sock, peerCon) {
+        //NEGOTIATE PEER CONNECTION
+        //This gets called when peerCon.setLocalDescription is called.
+        //Can be called several times during the connection negotiation process.
+        peerCon.onicecandidate = icecandidate_event => {
+            console.log("peerCon onicecandidate");
+            console.log(icecandidate_event.candidate);
+            sendMessage(sock, "icecandidate", icecandidate_event.candidate);
+            //sock.send(JSON.stringify(icecandidate_event.candidate));
+        };
+    }
+
+    // peerCon2.setRemoteDescription(description1);
+    //TODO this function assumes that all promises are fulfilled.
+    async function initiateVideoCall(sock, peerCon) {
+        let offer = await peerCon.createOffer();
+        await peerCon.setLocalDescription(offer);
+        sendMessage(sock, "offer", offer);
+    }
+
+    function addTracks(peerCon, selfStream) {
+        selfStream.getTracks().forEach(
+            track => {
+                console.log("adding track");
+                peerCon.addTrack(track, selfStream);
+            }
+        );
+    }
+
+    //TODO sometimes this fails to get a stream.
+    async function getSelfVideoStream() {
+        //Constraints can be used to control stuff like screen resolution fps etc.
+        const constraints = {audio: true, video: true};
+        //Get webcam and mic stream
+        const stream = await navigator.mediaDevices.getUserMedia(constraints);
+        return stream;
+    }
 
     function openWebsocket() {
         if (window["WebSocket"]) {
-            const conn = new WebSocket("ws://" + document.location.host + "/ws");
+            const sock = new WebSocket("ws://" + document.location.host + "/ws");
             const msg = {
-                "test": "ing"
+                "log": "WebSocket open"
             };
 
-
-            conn.onmessage = event => {
+            sock.onmessage = event => {
                 console.log(event);
             };
 
-            conn.onopen = event => {
-                console.log("open sokimee");
-                conn.send(JSON.stringify(msg));
+            sock.onopen = event => {
+                console.log("Opened a websocket");
+                sock.send(JSON.stringify(msg));
 
             };
 
-            conn.onclose = event => {
+            sock.onclose = event => {
 
             };
+            return sock;
         }
     }
 };
-
-// window.onload = async () => {
-//
-//     const videoSelfElem = document.getElementById("video1");
-//     const videoOtherElem = document.getElementById("video2");
-//
-//     //Constraints can be used to control stuff like screen resolution fps etc.
-//     const constraints = {audio: true, video: true};
-//     //Get webcam and mic stream
-//     const stream = await navigator.mediaDevices.getUserMedia(constraints);
-//
-//     console.log(stream);
-//     //Connect to html video element
-//     videoSelfElem.srcObject = stream;
-//
-//
-//
-//     const peerCon1 = new RTCPeerConnection(null);
-//     const peerCon2 = new RTCPeerConnection(null);
-//
-//     //This gets called when peerCon1.addLocalDescription is called.
-//     //Can be called several times during the connection negotiation process.
-//     peerCon1.onicecandidate = icecandidate_event => {
-//         console.log("peerCon1 onicecandidate");
-//         peerCon2.addIceCandidate(icecandidate_event.candidate);
-//     };
-//
-//     //This gets called when peerCon2.addLocalDescription is called.
-//     //Can be called several times during the connection negotiation process.
-//     peerCon2.onicecandidate = icecandidate_event => {
-//         console.log("peerCon2 onicecandidate");
-//         peerCon1.addIceCandidate(icecandidate_event.candidate);
-//     };
-//
-//     //This gets called when peerCon2.setRemoteDescription is called.
-//     peerCon2.ontrack = track_event =>  {
-//         console.log("peerCon2 ontrack");
-//         videoOtherElem.srcObject = track_event.streams[0];
-//     };
-//
-//
-//     stream.getTracks().forEach(
-//         track => {
-//             console.log("adding track");
-//             peerCon1.addTrack(track, stream);
-//         }
-//     );
-//
-//     const description1 = await peerCon1.createOffer();
-//     peerCon1.setLocalDescription(description1);
-//     peerCon2.setRemoteDescription(description1);
-//
-//     const description2 = await peerCon2.createAnswer();
-//     peerCon2.setLocalDescription(description2);
-//     peerCon1.setRemoteDescription(description2);
-//
-//
-// };
-//
-//
 

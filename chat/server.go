@@ -1,9 +1,11 @@
 package main
 
 import (
-	"github.com/gorilla/websocket"
+	"html/template"
 	"log"
 	"net/http"
+
+	"github.com/gorilla/websocket"
 )
 
 var signalHub = newHub()
@@ -21,9 +23,9 @@ func serveScript(writer http.ResponseWriter, request *http.Request) {
 
 //servePage is an http request handler which serves the webchat web page to a client.
 func servePage(writer http.ResponseWriter, request *http.Request) {
-	//pageTemplate, _ := template.ParseFiles("page.html")
-	//pageTemplate.Execute(writer, map[string]int{"clientId": <-idChan})
-	http.ServeFile(writer, request, "page.html")
+	pageTemplate, _ := template.ParseFiles("page.html")
+	pageTemplate.Execute(writer, map[string]int{})
+	//http.ServeFile(writer, request, "page.html")
 }
 
 //connectClient is an http request handler which upgrades the connection to a websocket and adds the connection to
