@@ -19,32 +19,18 @@ import (
 type webSocketAdapter struct {
 	id          int
 	conn        *websocket.Conn
-	chanFromHub <-chan interface{}
-	chanToHub   chan<- interface{}
+	chanFromHub <-chan map[string]interface{}
+	chanToHub   chan<- map[string]interface{}
 }
-
-//This channel provides unique ids for clients (0,1,...)
-var idChan = func() <-chan int {
-	ch := make(chan int)
-	id := 0
-	go func() {
-		for {
-			ch <- id
-			id++
-		}
-	}()
-	return ch
-}()
 
 //newWebSocketAdapter creates a webSocketAdapter.
 //
 //conn should be a WebSocket connection to the html webSocketAdapter.
 //
 //Returns the id of the new webSocketAdapter and channels for sending and receiving messages.
-func newWebSocketAdapter(conn *websocket.Conn) (clientId int, toClient chan<- interface{}, fromClient <-chan interface{}) {
-	chanFromHub := make(chan interface{})
-	chanToHub := make(chan interface{})
-	id := <-idChan
+func newWebSocketAdapter(id int, conn *websocket.Conn) (clientId int, toClient chan<- map[string]interface{}, fromClient <-chan map[string]interface{}) {
+	chanFromHub := make(chan map[string]interface{})
+	chanToHub := make(chan map[string]interface{})
 	newClient := webSocketAdapter{id, conn, chanFromHub, chanToHub}
 	newClient.run()
 	return id, chanFromHub, chanToHub
@@ -59,13 +45,14 @@ func (thisClient *webSocketAdapter) run() {
 func (thisClient *webSocketAdapter) listenToHub() {
 	thisClient.log("Listening for messages from hub")
 	for mapMsg := range thisClient.chanFromHub {
-		thisClient.log("Received a message")
+		//thisClient.log("Received a message from hub")
 		err := thisClient.conn.WriteJSON(mapMsg)
 		if err != nil {
 			thisClient.log(err)
 			thisClient.log("Failed to write to WebSocket")
 			break
 		}
+		//thisClient.log("sent message to client")
 	}
 	thisClient.log("Stopped listening for messages from hub")
 	thisClient.Close()
@@ -74,16 +61,18 @@ func (thisClient *webSocketAdapter) listenToHub() {
 //listenToSocket waits for messages coming over the WebSocket and then sends them over the send channel,
 // to be picked up by the hub.
 func (thisClient *webSocketAdapter) listenToSocket() {
-	thisClient.log("Listening to messages from WebSocket")
+	thisClient.log("Listening for messages from WebSocket")
 	for {
-		var jsonMsg interface{}
+		var jsonMsg map[string]interface{}
 		err := thisClient.conn.ReadJSON(&jsonMsg)
 		if err != nil {
 			thisClient.log("Error in listenToSocket: " + err.Error())
+			//TODO this drops closes the WebSocket when it receives an error: BAD BEHAVIOUR.
 			break
 		} else {
-			thisClient.log("Sending message to hub")
+			//thisClient.log("Received message from client")
 			thisClient.chanToHub <- jsonMsg
+			//thisClient.log("Sent message to hub")
 		}
 	}
 	thisClient.log("Stopped listening to socket")
@@ -99,5 +88,5 @@ func (thisClient *webSocketAdapter) Close() {
 }
 
 func (thisClient *webSocketAdapter) log(entry interface{}) {
-	log.Printf("sockAdapter %d:\t%s", thisClient.id, entry)
+	log.Printf("Sock %d:\t\t%s", thisClient.id, entry)
 }
