@@ -7,6 +7,7 @@ window.onload = async () => {
 
         const sock = openWebSocket();
         const selfStream = await getSelfVideoStream();
+        videoSelfElem.muted = true;
         videoSelfElem.srcObject = selfStream;
 
         const peerCon = new RTCPeerConnection(null);
@@ -54,6 +55,7 @@ window.onload = async () => {
         sendMessage(sock, "offer", offer);
         console.log("Sent offer of video call connection");
     }
+
 
     function openWebSocket() {
         if (window["WebSocket"]) {
