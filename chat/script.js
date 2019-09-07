@@ -59,7 +59,7 @@ window.onload = async () => {
 
     function openWebSocket() {
         if (window["WebSocket"]) {
-            const sock = new WebSocket("ws://" + document.location.host + "/ws");
+            const sock = new WebSocket("wss://" + document.location.host + "/ws");
 
             sock.onmessage = event => {
                 console.log("Received message");

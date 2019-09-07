@@ -1,11 +1,10 @@
 package main
 
 import (
+	"github.com/gorilla/websocket"
 	"html/template"
 	"log"
 	"net/http"
-
-	"github.com/gorilla/websocket"
 )
 
 func main() {
@@ -13,17 +12,21 @@ func main() {
 	http.HandleFunc("/", servePage)
 	http.HandleFunc("/ws", connectClient(signalHub))
 	http.HandleFunc("/script.js", serveScript)
-	http.ListenAndServe(":5000", nil)
+	log.Fatal(http.ListenAndServeTLS(":5000", "cert.pem", "key.pem", nil))
 }
 
 func serveScript(writer http.ResponseWriter, request *http.Request) {
-	http.ServeFile(writer, request, "script.js")
+	http.ServeFile(writer, request, "chat/script.js")
 }
 
 //servePage is an http request handler which serves the video chat web page to a client.
 func servePage(writer http.ResponseWriter, request *http.Request) {
-	pageTemplate, _ := template.ParseFiles("page.html")
-	pageTemplate.Execute(writer, map[string]int{})
+	pageTemplate, err := template.ParseFiles("chat/page.html")
+	if err != nil {
+		log.Println(err)
+	} else {
+		pageTemplate.Execute(writer, map[string]int{})
+	}
 }
 
 //connectClient returns an http request handler which upgrades the connection to a WebSocket and adds the connection to
