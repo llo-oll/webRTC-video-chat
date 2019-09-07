@@ -19,7 +19,8 @@ func serveScript(writer http.ResponseWriter, request *http.Request) {
 	http.ServeFile(writer, request, "chat/script.js")
 }
 
-//servePage is an http request handler which serves the video chat web page to a client.
+// servePage is an http request handler which serves the video chat web page to a
+// client.
 func servePage(writer http.ResponseWriter, request *http.Request) {
 	pageTemplate, err := template.ParseFiles("chat/page.html")
 	if err != nil {
@@ -29,12 +30,12 @@ func servePage(writer http.ResponseWriter, request *http.Request) {
 	}
 }
 
-//connectClient returns an http request handler which upgrades the connection to a WebSocket and adds the connection to
-//the signalling hub.
+// connectClient returns an http request handler which upgrades the connection to
+// a WebSocket and adds the connection to the signalling hub.
 func connectClient(signalHub hub) func(http.ResponseWriter, *http.Request) {
 	handler :=
 		func(writer http.ResponseWriter, request *http.Request) {
-			//upgrade connection
+			// upgrade connection
 			upgrader := websocket.Upgrader{
 				HandshakeTimeout:  0,
 				ReadBufferSize:    1024,

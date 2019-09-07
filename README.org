@@ -1,0 +1,10 @@
+* WebRTC Video Chat
+This currently provides two way video chat between two clients using WebRTC.
+
+The server provides the signalling capability for the clients to create a peer to peer connection between themselves.
+
+** SSL certificates
+The server uses https. To self sign certificates for use during development use openssl in the root directory:
+#+BEGIN_SRC bash
+openssl req -x509 -newkey rsa:4096 -keyout key.pem -out cert.pem -nodes -days 365 -subj '/CN=localhost'
+#+END_SRC

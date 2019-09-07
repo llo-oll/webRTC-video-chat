@@ -12,15 +12,16 @@ window.onload = async () => {
 
         const peerCon = new RTCPeerConnection(null);
 
-        //Takes the tracks from the local stream and adds them to the connection.
+        // Takes the tracks from the local stream and adds them to the connection.
         addTracksToConnection(peerCon, selfStream);
 
-        //Ice callbacks are used, by the underlying system, to negotiate the details of a connection with the remote
-        //peer. All we need to do is set up the callbacks and the rest is automagic.
+        // Ice callbacks are used, by the underlying system, to negotiate the
+        // details of an RTC connection with the remote peer. All we need to do
+        // is set up the callbacks and the rest is automagic.
         setUpIceCallbacks(sock, peerCon);
 
-        //The ontrack callback is fired when a remote video stream has been negotiated,
-        //it adds the stream to an html video element.
+        // The ontrack callback is fired when a remote video stream has been
+        // negotiated. It adds the stream to an html video element.
         setUpOnTrackCallback(peerCon, videoOtherElem);
 
         sock.onmessage = event => receiveMessage(event.data, peerCon, sock);
@@ -75,6 +76,7 @@ window.onload = async () => {
             };
             return sock;
         }
+        return null;
     }
 
     async function receiveAnswer(answer, peerCon) {
@@ -148,3 +150,22 @@ window.onload = async () => {
         };
     }
 };
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

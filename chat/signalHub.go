@@ -38,16 +38,20 @@ func (thisHub *hub) addConnection(conn *websocket.Conn) {
 		return
 	}
 
-	clientId, chanToClient, chanFromClient := newWebSocketAdapter(<-thisHub.idChan, conn)
+	clientId, chanToClient, chanFromClient :=
+		newWebSocketAdapter(<-thisHub.idChan, conn)
 	thisHub.log("Created new webSocketAdapter")
 	thisHub.clientChanMap[clientId] = chanToClient
 	go func() {
 		for msg := range chanFromClient {
-			thisHub.log(fmt.Sprintf("Received message of type %v from %v.", msg["type"], clientId))
+			thisHub.log(fmt.Sprintf(
+				"Received message of type %v from %v.",
+				msg["type"], clientId))
 			for id, ch := range thisHub.clientChanMap {
 				if id != clientId {
 					ch <- msg
-					thisHub.log(fmt.Sprintf("Forwarded message to %v", id))
+					thisHub.log(fmt.Sprintf(
+						"Forwarded message to %v", id))
 				}
 			}
 		}
