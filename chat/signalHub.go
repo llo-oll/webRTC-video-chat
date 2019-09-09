@@ -30,30 +30,52 @@ func newHub() hub {
 	return aHub
 }
 
+func (thisHub *hub) clientIds() []int {
+	var keys []int
+	for k := range thisHub.clientChanMap {
+		keys = append(keys, k)
+	}
+	return keys
+}
+
 func (thisHub *hub) addConnection(conn *websocket.Conn) {
 	thisHub.log("Received new connection")
-	if len(thisHub.clientChanMap) >= 2 {
-		//TODO client doesn't know it has been rejected
-		thisHub.log("Exceeded max connections. Rejecting new connection")
-		return
-	}
 
 	clientId, chanToClient, chanFromClient :=
 		newWebSocketAdapter(<-thisHub.idChan, conn)
 	thisHub.log("Created new webSocketAdapter")
 	thisHub.clientChanMap[clientId] = chanToClient
+
 	go func() {
 		for msg := range chanFromClient {
 			thisHub.log(fmt.Sprintf(
 				"Received message of type %v from %v.",
 				msg["type"], clientId))
-			for id, ch := range thisHub.clientChanMap {
-				if id != clientId {
-					ch <- msg
-					thisHub.log(fmt.Sprintf(
-						"Forwarded message to %v", id))
+			switch msg["type"] {
+			case "getClientIds":
+				thisHub.log(fmt.Sprintf("Sent ids to client %v.",
+					clientId))
+				msg := make(map[string]interface{})
+				msg["type"] = "clientIds"
+				clientIds := thisHub.clientIds()
+				otherIds := []int{}
+				for _, id := range clientIds {
+					if id != clientId {
+						otherIds = append(otherIds, id)
+					}
 				}
+				msg["message"] = otherIds
+				chanToClient <- msg
 			}
+
+			// msg["clientId"] = clientId
+			// for id, ch := range thisHub.clientChanMap {
+			// 	if id != clientId {
+			// 		ch <- msg
+			// 		thisHub.log(fmt.Sprintf(
+			// 			"Forwarded message to %v", id))
+			// 	}
+			// }
 		}
 		close(chanToClient)
 		delete(thisHub.clientChanMap, clientId)

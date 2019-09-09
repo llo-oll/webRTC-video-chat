@@ -5,32 +5,29 @@ window.onload = async () => {
         const videoOtherElem = document.getElementById("video2");
         const callButton = document.getElementById("callbutton");
 
-        const sock = openWebSocket();
+
+        
         const selfStream = await getSelfVideoStream();
         videoSelfElem.muted = true;
         videoSelfElem.srcObject = selfStream;
 
-        const peerCon = new RTCPeerConnection(null);
+        const sock = openWebSocket();
 
-        // Takes the tracks from the local stream and adds them to the connection.
-        addTracksToConnection(peerCon, selfStream);
+        // const peerCon = new RTCPeerConnection(null);
 
-        // Ice callbacks are used, by the underlying system, to negotiate the
-        // details of an RTC connection with the remote peer. All we need to do
-        // is set up the callbacks and the rest is automagic.
-        setUpIceCallbacks(sock, peerCon);
+        // addTracksToConnection(peerCon, selfStream);
+        // setUpIceCallbacks(sock, peerCon);
 
-        // The ontrack callback is fired when a remote video stream has been
-        // negotiated. It adds the stream to an html video element.
-        setUpOnTrackCallback(peerCon, videoOtherElem);
+        // setUpOnTrackCallback(peerCon, videoOtherElem);
 
-        sock.onmessage = event => receiveMessage(event.data, peerCon, sock);
-
-        //Sends an offer to the other client. This begins the negotiation process.
-        callButton.onclick = () => initiateVideoCall(sock, peerCon);
-
+        // sock.onmessage = event => receiveMessage(event, peerCon);
+        //sendMessage(sock, "haha", "");
+        // Sends an offer to the other client. This begins the negotiation process.
+        // callButton.onclick = () => initiateVideoCall(sock, peerCon);
     }
 
+
+    // Takes the tracks from the local stream and adds them to the connection.
     function addTracksToConnection(peerCon, selfStream) {
         selfStream.getTracks().forEach(
             track => {
@@ -40,11 +37,11 @@ window.onload = async () => {
         );
     }
 
-    //TODO sometimes this fails to get a stream.
+    // TODO sometimes this fails to get a stream.
     async function getSelfVideoStream() {
-        //Constraints can be used to control stuff like screen resolution fps etc.
+        // Constraints can be used to control stuff like screen resolution fps etc.
         const constraints = {audio: true, video: true};
-        //Get webcam and mic stream
+        // Get webcam and mic stream
         const stream = await navigator.mediaDevices.getUserMedia(constraints);
         console.log("Opened self video stream");
         return stream;
@@ -62,13 +59,11 @@ window.onload = async () => {
         if (window["WebSocket"]) {
             const sock = new WebSocket("wss://" + document.location.host + "/ws");
 
-            sock.onmessage = event => {
-                console.log("Received message");
-                console.log(event);
-            };
+            sock.onmessage = event => receiveMessage(event);
 
             sock.onopen = () => {
                 console.log("Opened WebSocket");
+                sendMessage(sock, "getClientIds", "");
             };
 
             sock.onclose = () => {
@@ -95,21 +90,35 @@ window.onload = async () => {
         console.log("Added ICE candidate to connection");
     }
 
-    function receiveMessage(msg, peerCon, sock) {
-        msg = JSON.parse(msg);
+    async function receiveMessage(event) {
+        console.log(event);
+
+        const peerConMap = {}; 
+        const msg = JSON.parse(event.data);
+        const sock = event.target;
 
         switch (msg.type) {
             case "offer":
                 console.log("Received connection offer");
-                receiveVideoCall(msg.message, peerCon, sock);
+                const answer = await receiveOffer(msg.message,
+                                              peerConMap[msg.from], sock);
+                sendMessage(sock, "answer", answer);
+                console.log("Sent answer");
                 break;
             case "answer":
                 console.log("Received connection answer");
-                receiveAnswer(msg.message, peerCon);
+                receiveAnswer(msg.message, peerConMap[msg.from]);
                 break;
             case "icecandidate":
                 console.log("Received ice candidate");
-                receiveIceCandidate(msg.message, peerCon);
+                receiveIceCandidate(msg.message, peerConMap[msg.from]);
+                break;
+            case "clientIds":
+                console.log("Received ids");
+                console.log(msg);
+                const newIds = msg.message.filter(
+                    id => !Object.keys(peerConMap).includes(id));
+                console.log(newIds);
                 break;
             default:
                 console.log("Received unclassified message");
@@ -117,15 +126,14 @@ window.onload = async () => {
         }
     }
 
-    async function receiveVideoCall(offer, peerCon, sock) {
+    async function receiveOffer(offer, peerCon) {
         console.log("Received offer of video call");
         const description = new RTCSessionDescription(offer);
         await peerCon.setRemoteDescription(description);
         console.log("Set remote description");
         const answer = await peerCon.createAnswer();
         await peerCon.setLocalDescription(answer);
-        sendMessage(sock, "answer", answer);
-        console.log("Sent answer");
+        return answer;
     }
 
     function sendMessage(sock, type, msg) {
@@ -133,8 +141,11 @@ window.onload = async () => {
         sock.send(JSON.stringify({"type": type, message: msg}));
     }
 
+    // Ice callbacks are used, by the underlying system, to negotiate the
+    // details of an RTC connection with the remote peer. All we need to do
+    // is set up the callbacks and the rest is automagic.
     function setUpIceCallbacks(sock, peerCon) {
-        //This gets called several times during the connection negotiation process.
+        // This gets called several times during the connection negotiation process.
         peerCon.onicecandidate = icecandidate_event => {
             console.log("peerCon onicecandidate callback has fired");
             console.log(icecandidate_event.candidate);
@@ -142,6 +153,8 @@ window.onload = async () => {
         };
     }
 
+    // The ontrack callback is fired when a remote video stream has been
+    // negotiated. It adds the stream to an html video element.
     function setUpOnTrackCallback(peerCon, videoOtherElem) {
         peerCon.ontrack = track_event => {
             console.log("Peer Connection ontrack callback has fired");
