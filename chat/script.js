@@ -1,8 +1,12 @@
 window.onload = async () => {
     /*Set up the page to be ready to send and receive RTC peer to peer video calls*/
     {
+        if (!window["WebSocket"]) {
+            console.error("Websockets not available");
+            return;
+        }
         const videoSelfElem = document.getElementById("video1");
-        const videoOtherElem = document.getElementById("video2");
+        const videoList = document.getElementById("videolist");
         const callButton = document.getElementById("callbutton");
 
 
@@ -11,7 +15,20 @@ window.onload = async () => {
         videoSelfElem.muted = true;
         videoSelfElem.srcObject = selfStream;
 
-        const sock = openWebSocket();
+        const sock = new WebSocket("wss://" + document.location.host + "/ws");
+        
+        
+        sock.onopen = () => {
+            console.log("Opened WebSocket");
+            sendMessage(sock, "getClientIds", "");
+        };
+        
+        sock.onclose = () => {
+                console.log("Closed WebSocket");
+        };
+
+        sock.onmessage = receiveMessage(selfStream, videoList);
+        console.log(sock); 
 
         // const peerCon = new RTCPeerConnection(null);
 
@@ -55,25 +72,6 @@ window.onload = async () => {
     }
 
 
-    function openWebSocket() {
-        if (window["WebSocket"]) {
-            const sock = new WebSocket("wss://" + document.location.host + "/ws");
-
-            sock.onmessage = event => receiveMessage(event);
-
-            sock.onopen = () => {
-                console.log("Opened WebSocket");
-                sendMessage(sock, "getClientIds", "");
-            };
-
-            sock.onclose = () => {
-                console.log("Closed WebSocket");
-            };
-            return sock;
-        }
-        return null;
-    }
-
     async function receiveAnswer(answer, peerCon) {
         const description = new RTCSessionDescription(answer);
         await peerCon.setRemoteDescription(description);
@@ -90,18 +88,20 @@ window.onload = async () => {
         console.log("Added ICE candidate to connection");
     }
 
-    async function receiveMessage(event) {
-        console.log(event);
+    async function receiveMessage(selfStream, videoList) {
 
         const peerConMap = {}; 
-        const msg = JSON.parse(event.data);
-        const sock = event.target;
 
-        switch (msg.type) {
+        return async event => {
+            console.log(event);
+            const msg = JSON.parse(event.data);
+            const sock = event.target;
+
+            switch (msg.type) {
             case "offer":
                 console.log("Received connection offer");
                 const answer = await receiveOffer(msg.message,
-                                              peerConMap[msg.from], sock);
+                                                  peerConMap[msg.from], sock);
                 sendMessage(sock, "answer", answer);
                 console.log("Sent answer");
                 break;
@@ -119,11 +119,32 @@ window.onload = async () => {
                 const newIds = msg.message.filter(
                     id => !Object.keys(peerConMap).includes(id));
                 console.log(newIds);
+                newIds.forEach(
+                    id => {
+                        const vid = document.createElement("video");
+                        vid.setAttribute("autoplay", "");
+                        peerConMap[id] = newPeerCon(selfStream, vid, sock);
+                        videoList.append(vid);
+                    });
                 break;
             default:
                 console.log("Received unclassified message");
                 console.log(msg);
-        }
+            }
+        };
+    }
+
+    /**
+     * selfStream is the camera stream from this client.
+     * videoElement is for displaying the incoming stream from the new peer.
+     **/
+    function newPeerCon(selfStream, videoElement, sock) {
+        const peerCon = new RTCPeerConnection(null);
+
+        addTracksToConnection(peerCon, selfStream);
+        setUpIceCallbacks(sock, peerCon);
+        setUpOnTrackCallback(peerCon, videoElem);
+        return peerCon;
     }
 
     async function receiveOffer(offer, peerCon) {
